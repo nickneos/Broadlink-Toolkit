@@ -16,6 +16,7 @@ def get_device():
         n += 1
         type = device.get_type()
         mac = device.mac.hex().upper()
+        mac = "".join(reversed([mac[i:i+2] for i in range(0, len(mac), 2)])) # fixes reversed mac
         mac = ':'.join(mac[i:i+2] for i in range(0, len(mac), 2)) # adds ':' every 2nd char of mac
         ip = device.host[0]
         print(f'Device [{n}]\nName: {type}\nIP: {ip}\nMAC: {mac}\n')
