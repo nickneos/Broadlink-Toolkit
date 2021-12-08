@@ -1,7 +1,13 @@
 import broadlink
+from broadlink.exceptions import ReadError,StorageError
 import time
 from base64 import b64decode, b64encode
 from datetime import datetime, timedelta
+import tkinter as tk
+from tkinter import filedialog
+from tkinter.filedialog import asksaveasfile
+import os.path
+
 
 def get_device():
           
@@ -30,7 +36,7 @@ def get_device():
     sel = None
     while sel not in range(1,n+1):
         sel = int(input(f'Select a device [1-{n}]: '))
-    return devices[n-1]
+    return devices[sel-1]
 
 def get_packet(device):
  
@@ -41,32 +47,65 @@ def get_packet(device):
     start_time = datetime.utcnow()
     
     while packet is None and \
-            (datetime.utcnow() - start_time) <= timedelta(seconds=10):
-        # time.sleep(3)
-        packet = device.check_data()
+            (datetime.utcnow() - start_time) <= timedelta(seconds=30):
+        try:
+            time.sleep(1)
+            packet = device.check_data()
+        except (ReadError, StorageError):
+            continue
 
     if packet:
         return b64encode(packet).decode('utf8')
     
     device = None
 
-def main(in_txt = 'input.txt', out_txt = 'output.csv', quiet_mode = False):
 
+def main(quiet_mode = False):
+
+    # initialise some variables
+    output = ""
+    fn = ""
+
+    # select input file
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        useTK = True
+
+    except tk.TclError:
+        useTK = False
+
+    if useTK:
+        while not (os.path.isfile(fn)):
+            print("Select the input file")
+            fn = filedialog.askopenfilename(title="Select input file",filetypes=[("Text Documents","*.txt"),("CSV","*.csv"),("All Files","*.*")])
+    
+    else:
+        fn = input("Enter input filename: ")
+    
+        while not (os.path.isfile(fn)):
+            print(f"{fn} not valid file")
+            fn = input("Enter input filename: ")        
+    
+    input_file = open(fn, 'r')
+
+    # get broadlink device
     device = get_device()
 
-    f_in = open(in_txt, 'r')
-    f_out = open(out_txt, 'w')
+    # check to make sure that the file was opened
+    if input_file.mode == 'r': 
 
-    if f_in.mode == 'r': # check to make sure that the file was opened
-        
-        lines = list(f_in.readlines())
+        commands = list(input_file.readlines())
         i = 0
 
         # loop through each command in input file
-        while i < len(lines):
-            line = lines[i].strip()
-            print(f'\n*** Press button for {line} ***')
+        while i < len(commands):
+            
+            # get packet for command
+            cmnd = commands[i].strip()
+            print(f'\n*** Press button for {cmnd} ***')
             p = get_packet(device)
+
             # if no packet received, prompt to try again
             while p is None:
                 prompt = None
@@ -74,8 +113,9 @@ def main(in_txt = 'input.txt', out_txt = 'output.csv', quiet_mode = False):
                     prompt = str(input('Nothing received. Try again?\n(Y/N) '))
                 if prompt.strip().upper() == 'N': 
                     break     
-                print(f'\n*** Press button for {line}***')
+                print(f'\n*** Press button for {cmnd}***')
                 p = get_packet(device)
+                
             # break loop if user chooses not to try again
             if p is None:
                 break
@@ -83,27 +123,41 @@ def main(in_txt = 'input.txt', out_txt = 'output.csv', quiet_mode = False):
             # print packet
             print(f'{p}\n')
 
-            if not quiet_mode: # when not in quiet mode, prompts for next action
+
+            # quiet mode doesn't prompt for next action
+            if not quiet_mode: 
                 # user prompt for next action
                 sel = input(f'Press:\n[ENTER] to continue\n[R] to redo last command\n[S] to stop\n')
                 if sel in ['R','r']:
                     continue
                 elif sel in ['S','s']:
-                    f_out.write(f'{line},{p}\n')
+                    output += f'{cmnd},{p}\n'
                     break
                 else:
-                    f_out.write(f'{line},{p}\n')
+                    output += (f'{cmnd},{p}\n')
             else: # when in quiet mode, automatically goes to next command
-                f_out.write(f'{line},{p}\n')
-                time.sleep(5)
+                output += (f'{cmnd},{p}\n')
+                time.sleep(1)
+
             i += 1
 
-    # close text files
-    f_in.close
-    f_out.close
-    print(f'\nSaving to {out_txt}\n')
+    # create file for output of codes
+    if useTK:
+        print("Save output file of codes as...")
+        output_file = asksaveasfile(initialfile = 'Output.csv', defaultextension=".csv",filetypes=[("All Files","*.*"),("Text Documents","*.txt"),("CSV","*.csv")])
 
-if __name__ == '__main__': 
-    main('input.txt', 'output.csv', False)
+    else:
+        fn = input("Save output file of codes as: ")            
+        output_file = open(fn, 'w')
+
+    output_file.write(output)
+
+    # close text files
+    input_file.close
+    output_file.close
+
+
+if __name__ == '__main__':
+    main()
 
 

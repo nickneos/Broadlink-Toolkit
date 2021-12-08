@@ -1,5 +1,5 @@
 *
 !*.py
 !readme.md
-!input.txt
+!input_example.txt
 !.gitignore
