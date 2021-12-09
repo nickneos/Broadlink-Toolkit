@@ -1,5 +1,7 @@
-*
-!*.py
-!readme.md
-!input_example.txt
-!.gitignore
+
+__pycache__/*
+build/*
+dist/*
+*.csv
+*.json
+!example.json

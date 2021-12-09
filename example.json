@@ -1,0 +1,24 @@
+{
+    "manufacturer": "Fujitsu",
+    "supportedModels": [
+        "Unknown"
+    ],
+    "supportedController": "Broadlink",
+    "commandsEncoding": "Base64",
+    "minTemperature": 18.0,
+    "maxTemperature": 30.0,
+    "precision": 1.0,
+    "operationModes": [
+        "cool",
+        "dry",
+        "fan_only",
+        "heat"
+    ],
+    "fanModes": [
+        "auto",
+        "high",
+        "med",
+        "low",
+        "quiet"
+    ]
+}
