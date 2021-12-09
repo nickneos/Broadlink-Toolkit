@@ -1,4 +1,5 @@
 from tkinter import filedialog
+from tkinter.filedialog import asksaveasfile
 from bl_common import get_device, get_packet
 from time import sleep
 
@@ -146,10 +147,23 @@ def main(quiet_mode = False):
     json_in["commands"] = cmd
     json_out = json.dumps(json_in, indent=4)
 
-    with open(json_fn, "w") as outfile:
-        outfile.write(json_out)
+    if useTK:
+        print("Save output file...")
+        outfile = asksaveasfile(
+            initialfile = 'output.json', defaultextension=".json",
+            filetypes=[("JSON","*.json"),("All Files","*.*")]
+        )
+    else:
+        fn = input("Save output file as: ")            
+        outfile = open(fn, 'w')
 
-    print(f'\nSaving to {json_fn}\n')
+    outfile.write(json_out)
+    print(f'\nSaving to {outfile.name}\n')
+
+    # close text files
+    jsonFile.close
+    outfile.close
+
 
 if __name__ == '__main__': 
     main()
