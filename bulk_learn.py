@@ -57,10 +57,13 @@ def main(quiet_mode = False):
             # if no packet received, prompt to try again
             while p is None:
                 prompt = None
+
                 while prompt not in ['Y','y','N','n']:
                     prompt = str(input('Nothing received. Try again?\n(Y/N) '))
+
                 if prompt.strip().upper() == 'N': 
-                    break     
+                    break
+
                 print(f'\n> Press button for {cmnd}')
                 p = get_packet(device)
                 
@@ -73,9 +76,14 @@ def main(quiet_mode = False):
 
 
             # quiet mode doesn't prompt for next action
-            if not quiet_mode: 
-                # user prompt for next action
+            if quiet_mode:
+                output += (f'{cmnd},{p}\n')
+                sleep(1)
+
+            # prompt for next action
+            else: 
                 sel = input(f'Press:\n[ENTER] to continue\n[R] to redo last command\n[S] to stop\n')
+                
                 if sel in ['R','r']:
                     continue
                 elif sel in ['S','s']:
@@ -83,9 +91,6 @@ def main(quiet_mode = False):
                     break
                 else:
                     output += (f'{cmnd},{p}\n')
-            else: # when in quiet mode, automatically goes to next command
-                output += (f'{cmnd},{p}\n')
-                sleep(1)
 
             i += 1
 

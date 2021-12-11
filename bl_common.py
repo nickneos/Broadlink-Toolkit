@@ -1,6 +1,6 @@
 from broadlink.exceptions import ReadError,StorageError
-from base64 import b64decode, b64encode
-from datetime import datetime, timedelta
+from base64 import b64encode
+from datetime import datetime
 from time import sleep
 
 import broadlink
@@ -41,7 +41,7 @@ def get_device():
         return devices[sel-1]
 
 
-def get_packet(device):
+def get_packet(device, timeout = 10):
  
     device.auth()
     device.enter_learning()
@@ -50,7 +50,7 @@ def get_packet(device):
     start_time = datetime.utcnow()
     
     while packet is None and \
-            (datetime.utcnow() - start_time) <= timedelta(seconds=30):
+            (datetime.utcnow() - start_time).total_seconds() <= timeout:
         try:
             sleep(1)
             packet = device.check_data()

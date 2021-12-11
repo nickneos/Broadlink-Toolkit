@@ -5,22 +5,21 @@ from base64 import b64decode, binascii
 def main():
     device = get_device()
     device.auth()
-    sel = None
+    packet = ""
 
-    while sel not in (['q','Q']):
+    while packet not in (["q","Q"]):
         
-        packet = input('\nEnter IR/RF Packet to send: \n')
+        packet = input("\nEnter IR/RF Packet to send or [Q] to quit: \n")
         
         try :
-            payload = b64decode(packet)
-            device.send_data(payload)
+            if packet not in ["Q","q"]:
+                payload = b64decode(packet)
+                device.send_data(payload)
+                print("Packet sent\n")
             
-            print('Packet sent\n')
-            sel = input('\nPress [Q] to quit or [Enter] to send another command: \n')
-
         except binascii.Error:
-            print('Packet not valid\n')
-            sel = input('\nPress [Q] to quit or [Enter] to send another command: \n')
+            print("Packet not valid\n")
+            packet = input("\nEnter IR/RF Packet to send or [Q] to quit: \n")
 
 
-if __name__ == '__main__': main()
+if __name__ == "__main__": main()
