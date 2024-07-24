@@ -2,11 +2,12 @@ from broadlink.exceptions import ReadError,StorageError
 from base64 import b64encode
 from datetime import datetime
 from time import sleep
+from base64 import b64decode, binascii
 
 import broadlink
 
 def get_device():
-          
+
     # discover availabile devices on the local network
     devices = broadlink.discover(timeout=5)
 
@@ -36,9 +37,9 @@ def get_device():
     # when multiple devices discovered, capture device selection from user
     else:
         sel = None
-        while sel not in range(1,n+1):
-            sel = int(input(f'Select a device [1-{n}]: '))
-        return devices[sel-1]
+        while sel not in range(1, n + 1):
+            sel = int(input(f"Select a device [1-{n}]: "))
+        return devices[sel - 1]
 
 
 def get_packet(device, timeout = 10):
@@ -61,3 +62,54 @@ def get_packet(device, timeout = 10):
         return b64encode(packet).decode('utf8')
     
     device = None
+
+
+def learn_command(device, command_lbl=None):
+    if command_lbl:
+        prompt_txt = f'\n> Press button for {command_lbl}'
+    else:
+        prompt_txt = "\n> Press a button\n"
+
+    # get packet
+    print(prompt_txt)
+    p = get_packet(device, 5)
+
+    # if no packet received, prompt to try again
+    while p is None:
+        prompt = None
+        
+        while prompt not in ['Y','y','N','n']:
+            prompt = str(input('Nothing received. Try again?\n(Y/N) '))
+        
+        if prompt.strip().upper() == 'N':
+            break
+
+        print(prompt_txt)
+        p = get_packet(device, 5)
+
+    # break loop if user chooses not to try again
+    if p is None:
+        return None
+
+    # print packet
+    print(f'{p}\n')
+
+    return p
+
+
+def send_command(device, packet=""):
+    device.auth()
+
+    while packet not in (["q", "Q"]):
+        
+        packet = input("\nEnter IR/RF Packet to send or [Q] to quit: \n") if packet == "" else packet
+        
+        try :
+            if packet not in ["Q","q"]:
+                payload = b64decode(packet)
+                device.send_data(payload)
+                print("Packet sent\n")
+            
+        except binascii.Error:
+            print("Packet not valid\n")
+            packet = input("\nEnter IR/RF Packet to send or [Q] to quit: \n")

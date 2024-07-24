@@ -1,6 +1,6 @@
 from tkinter import filedialog
 from tkinter.filedialog import asksaveasfile
-from bl_common import get_device, get_packet
+from helpers import get_device, get_packet, learn_command
 from time import sleep
 
 import tkinter
@@ -51,29 +51,11 @@ def main(quiet_mode = False):
             
             # get packet for command
             cmnd = commands[i].strip()
-            print(f'\n> Press button for {cmnd}')
-            p = get_packet(device)
-
-            # if no packet received, prompt to try again
-            while p is None:
-                prompt = None
-
-                while prompt not in ['Y','y','N','n']:
-                    prompt = str(input('Nothing received. Try again?\n(Y/N) '))
-
-                if prompt.strip().upper() == 'N': 
-                    break
-
-                print(f'\n> Press button for {cmnd}')
-                p = get_packet(device)
+            p = learn_command(device, cmnd)
                 
-            # break loop if user chooses not to try again
+            # break loop if no command received (eg. user chooses to not try again)
             if p is None:
                 break
-            
-            # print packet
-            print(f'{p}\n')
-
 
             # quiet mode doesn't prompt for next action
             if quiet_mode:
@@ -108,8 +90,8 @@ def main(quiet_mode = False):
     output_file.write(output)
 
     # close text files
-    input_file.close
-    output_file.close
+    input_file.close()
+    output_file.close()
 
 
 if __name__ == '__main__':
