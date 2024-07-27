@@ -1,155 +1,155 @@
-from tkinter import filedialog
-from tkinter.filedialog import asksaveasfile
-from helpers import get_device, get_packet, learn_command
-from time import sleep
-
-import tkinter
-import os.path
 import json
+import argparse
+
+# my modules
+from helpers import get_device, learn_command
 
 
-def main(quiet_mode=False):
+def main():
 
     # initialise some variables
-    json_fn = ""
-    cmd = {}
     suspend = False
+    args = parse_args()
+    json_config = args.json_file
 
-    # select json file using gui if available
-    try:
-        root = tkinter.Tk()
-        root.withdraw()
-        useTK = True
-    except tkinter.TclError:
-        useTK = False
+    # read json file to dict
+    with open(json_config, "r") as fp:
+        ac_dict = json.load(fp)
 
-    if useTK:
-        while not (os.path.isfile(json_fn)):
-            print("Select the JSON config file")
-            json_fn = filedialog.askopenfilename(
-                title="Select json file",
-                filetypes=[("JSON", "*.json"), ("All Files", "*.*")],
-            )
-    else:
-        json_fn = input("Enter input json: ")
-
-        while not (os.path.isfile(json_fn)):
-            print(f"{json_fn} not valid file")
-            json_fn = input("Enter input filename: ")
-
+    # get broadlink device
     device = get_device()
 
-    # open json file
-    with open(json_fn, "r") as jsonFile:
-        json_in = json.load(jsonFile)
-
     # get config values
-    TempMin = int(json_in["minTemperature"]) if "minTemperature" in json_in else 18
-    TempMax = int(json_in["maxTemperature"]) if "maxTemperature" in json_in else 30
-    TempStep = int(json_in["precision"]) if "precision" in json_in else 1
-    OpModes = json_in["operationModes"] if "operationModes" in json_in else ["cool", "heat"]
-    FanModes = json_in["fanModes"] if "fanModes" in json_in else ["auto"]
+    min_temp = int(ac_dict.get("minTemperature", 18))
+    max_temp = int(ac_dict.get("maxTemperature", 30))
+    temp_step = int(ac_dict.get("precision", 1))
+    op_modes = ac_dict.get("operationModes", ["cool", "heat"])
+    fan_modes = ac_dict.get("fanModes", ["auto"])
+    commands = ac_dict.get("commands", {})
 
-    # add "off" to Operation Modes
-    OpModes.insert(0, "off")
-
-    # loop through operation mode, fan mode and temperature range
-    for m in OpModes:
-        if m == "off":
-            cmd[m] = ""
-            FanModes2 = ["off"]
-            isOff = True
-        else:
-            cmd[m] = {}
-            FanModes2 = FanModes
-            isOff = False
-
-        for f in FanModes2:
-            t = TempMin
-            if not isOff:
-                cmd[m][f] = {}
-
-            while t <= TempMax:
-
-                # start with capturing "off" command
-                if isOff:
-                    button_nm = "off"
-                else:
-                    button_nm = f"{m}_{f}_{t}"
-
-                # get packet for command
-                p = learn_command(device, button_nm)
-
-                # break loop if no command received (eg. user chooses to not try again)
-                if p is None:
-                    break
-
-                # quiet mode doesn't prompt for next action
-                if not quiet_mode:
-
-                    # user prompt for next action
-                    sel = input(
-                        f"Press:\n[ENTER] to continue\n[R] to redo last command\n[S] to stop\n"
-                    )
-
-                    if sel in ["R", "r"]:
-                        continue
-
-                    elif sel in ["S", "s"]:
-                        if isOff:
-                            cmd[m] = p
-                        else:
-                            cmd[m][f][t] = p
-                        suspend = True
-                        break
-
-                    else:
-                        if isOff:
-                            cmd[m] = p
-                            break
-                        else:
-                            cmd[m][f][t] = p
-
-                # when in quiet mode, automatically goes to next command
-                else:
-                    sleep(1)
-                    if isOff:
-                        cmd[m] = p
-                        break
-                    else:
-                        cmd[m][f][t] = p
-
-                t = t + TempStep
-
-            if suspend:
-                break
-
+    # loop through operation modes
+    for op_mode in ["off"] + op_modes:
         if suspend:
             break
 
-    # remove off from Operation Modes
-    OpModes.remove("off")
+        # skip over off command if already in config
+        if op_mode == "off" and "off" in commands:
+            continue
 
-    # add dict to json and save json file
-    json_in["commands"] = cmd
+        # initialise operation mode dictionary
+        if op_mode not in commands:
+            commands[op_mode] = {}
 
-    if useTK:
-        print("Save output file...")
-        outfile = asksaveasfile(
-            initialfile="output.json",
-            defaultextension=".json",
-            filetypes=[("JSON", "*.json"), ("All Files", "*.*")],
-        )
+        # loop through fan modes
+        for fan_mode in fan_modes:
+            if suspend:
+                break
+
+            # initialise fan mode dictionary
+            if fan_mode not in commands[op_mode]:
+                commands[op_mode][fan_mode] = {}
+
+            # loop through temps
+            temp = min_temp
+            while temp <= max_temp:
+
+                # skip temp if already in config
+                if clean_temp(temp) in commands[op_mode][fan_mode]:
+                    temp += temp_step
+                    continue
+
+                # label for command
+                if op_mode == "off":
+                    lbl = "off" 
+                else:
+                    lbl = f"{op_mode}_{fan_mode}_{clean_temp(temp)}"
+
+                # get packet
+                pkt = learn_command(device, lbl)
+
+                # get next action
+                action = prompt_next_action()
+
+                # save command to json if action is continue or stop
+                if action in ["continue", "stop"]:
+
+                    if op_mode == "off":
+                        commands["off"] = pkt
+                    else:
+                        commands[op_mode][fan_mode][clean_temp(temp)] = pkt
+                    
+                    update_json(json_config, commands)
+
+                    # break out if action was stop
+                    if action == "stop":
+                        suspend = True
+                        break
+
+                    # increment temp
+                    temp += temp_step
+
+                # redo command if action is redo
+                else:
+                    continue
+
+                if op_mode == "off":
+                    break
+
+            if op_mode == "off":
+                break
+
+
+def prompt_next_action():
+    """Prompt user for next action
+
+    Returns:
+        str: one of "redo", "stop" or "continue"
+    """
+
+    sel = input(f"Press:\n[ENTER] to continue\n[R] to redo last command\n[S] to stop\n")
+
+    if sel in ["R", "r"]:
+        return "redo"
+    elif sel in ["S", "s"]:
+        return "stop"
     else:
-        fn = input("Save output file as: ")
-        outfile = open(fn, "w")
+        return "continue"
 
-    json.dump(json_in, outfile, indent=4)
-    print(f"\nSaving to {outfile.name}\n")
 
-    # close file
-    outfile.close()
+def update_json(json_config_file, commands_dict):
 
+    with open(json_config_file, "r") as fp:
+        config_dict = json.load(fp)
+
+    config_dict["commands"] = commands_dict
+
+    with open(json_config_file, "w") as fp:
+        json.dump(config_dict, fp, indent=4)
+
+
+def clean_temp(temp):
+
+    if isinstance(temp, int):
+        return str(temp)
+    elif isinstance(temp, float):
+        if int(temp) == temp:
+            return str(int(temp))
+        else:
+            return str(temp)
+    elif isinstance(temp, str):
+        return temp
+    else:
+        raise ValueError(f"Temperature: {temp} not valid")
+
+
+def parse_args():
+    # cli arguments
+    parser = argparse.ArgumentParser(
+        description="Generates json file of Climate IR commands for SmartIR Home Assistant integration"
+    )
+    parser.add_argument("json_file", metavar="JSON-FILE", help="SmartIR json file to update")
+
+    return parser.parse_args()
 
 if __name__ == "__main__":
     main()
